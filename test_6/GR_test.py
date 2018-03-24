@@ -5,21 +5,15 @@ import os
 import random
 import sys
 
-
 size=256
 batch_size=10
-num_batch=100
+num_batch=80
 img=[]
 label=[]
-img_batch=[]
-label_batch=[]
-n_classes=120
-Epoch = 10
-learn_rate = 0.01
-
+n_classes=6
 def read_and_decode(filename):
     #根据文件名生成一个队列
-    filename_queue = tf.train.string_input_producer([filename],Epoch)
+    filename_queue = tf.train.string_input_producer([filename])
 
     reader = tf.TFRecordReader()
     _, serialized_example = reader.read(filename_queue)   #返回文件名和文件
@@ -33,24 +27,21 @@ def read_and_decode(filename):
     img = tf.reshape(img, [size, size, 3])
     img = tf.cast(img, tf.float32)*(1. / 255) - 0.5
     label = tf.cast(features['label'], tf.int32)
-    
+    #label = tf.one_hot(label, depth= n_classes)
+    #label = tf.reshape(label, [_, n_classes])
     #print(label)
 
     return img, label
 
-
-def load_data():
-
-    img,label=read_and_decode("../tfrecord/train.tfrecords")
+img,label=read_and_decode("../test_6/train.tfrecords")
 
 
-    img_batch, label_batch = tf.train.shuffle_batch([img, label],
-                                                    batch_size=batch_size, capacity=2000,
-                                                    min_after_dequeue=1000)
-    label_batch = tf.one_hot(label_batch, depth= n_classes)
-    label_batch = tf.reshape(label_batch, [batch_size, n_classes])
-    return img_batch,label_batch
-    #print(label_batch)
+img_batch, label_batch = tf.train.shuffle_batch([img, label],
+                                                batch_size=batch_size, capacity=2000,
+                                                min_after_dequeue=1000)
+label_batch = tf.one_hot(label_batch, depth= n_classes)
+label_batch = tf.reshape(label_batch, [batch_size, n_classes])
+#print(label_batch)
 
 x = tf.placeholder(tf.float32, [None, size, size, 3])
 y_ = tf.placeholder(tf.float32, [None, n_classes])
@@ -221,7 +212,7 @@ weights = {
     'conv2_3x3_R1': tf.Variable(tf.random_normal([3,3,480,200])),
     'conv2_1x1_R2': tf.Variable(tf.random_normal([1,1,680,480])),
     'conv2_3x3_R2': tf.Variable(tf.random_normal([3,3,480,200])),
-    'FC2': tf.Variable(tf.random_normal([8*8*1024, 120]))
+    'FC2': tf.Variable(tf.random_normal([8*8*1024, 6]))
 }
 
 biases = {
@@ -236,7 +227,7 @@ biases = {
     'conv2_3x3_R1': tf.Variable(tf.random_normal([200])),
     'conv2_1x1_R2': tf.Variable(tf.random_normal([480])),
     'conv2_3x3_R2': tf.Variable(tf.random_normal([200])),
-    'FC2': tf.Variable(tf.random_normal([120]))
+    'FC2': tf.Variable(tf.random_normal([6]))
 
 }
 pooling = {
@@ -402,34 +393,30 @@ conv_B_5b = {
     'inception_MaxPool': tf.Variable(tf.random_normal([128]))
 }
 
+def cnnTrain():
+    out = GoogleLeNet_topological_structure(x)
 
-# 比较标签是否相等，再求的所有数的平均值，tf.cast(强制转换类型)
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=out, labels=y_))
 
-out = GoogleLeNet_topological_structure(x)
-
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=out, labels=y_))
-
-train_step = tf.train.AdamOptimizer(learn_rate).minimize(cross_entropy)
-accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(out, 1), tf.argmax(y_, 1)), tf.float32))
-tf.summary.scalar('loss', cross_entropy)
-tf.summary.scalar('accuracy', accuracy)
-merged_summary_op = tf.summary.merge_all()
-
-def do_train(epoch,_lr=0.01):
-    learn_rate=_lr
+    train_step = tf.train.AdamOptimizer(0.03).minimize(cross_entropy)
+    # 比较标签是否相等，再求的所有数的平均值，tf.cast(强制转换类型)
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(out, 1), tf.argmax(y_, 1)), tf.float32))
+    # 将loss与accuracy保存以供tensorboard使用
+    tf.summary.scalar('loss', cross_entropy)
+    tf.summary.scalar('accuracy', accuracy)
+    merged_summary_op = tf.summary.merge_all()
     # 数据保存器的初始化
     saver = tf.train.Saver()
+
     with tf.Session() as sess:
-        sess.run(tf.local_variables_initializer())
-        if epoch==0:        
-            saver.restore(sess, './model/train_dog_e4.model')
-        else:
-            saver.restore(sess, './model/train_dog_e4_'+str(epoch)+'/train_dog_e4_'+str(epoch)+'.model')
-        summary_writer = tf.summary.FileWriter('./train_test/dog_120_e4', graph=tf.get_default_graph())
+
+        sess.run(tf.global_variables_initializer())
+
+        summary_writer = tf.summary.FileWriter('./tmp/dog_120_e4', graph=tf.get_default_graph())
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-        for n in range(5):
+        for n in range(2):
              # 每次取batch_size张图片
             for i in range(num_batch):
                 val, l= sess.run([img_batch, label_batch])
@@ -439,8 +426,10 @@ def do_train(epoch,_lr=0.01):
                                            feed_dict={x:val,y_:l})
                 summary_writer.add_summary(summary, n*num_batch+i)
                 print(i+1,"loss:",loss)
+            if not os.path.exists('./acc'):
+                os.makedirs('./acc')
             sum_acc=0
-            fw=open('./acc/acc_e4_'+str(epoch+1)+'.txt','a')
+            fw=open('./acc/acc_e4.txt','a')
             for j in range(10):
                 val, l= sess.run([img_batch, label_batch])   
                 acc = accuracy.eval({x:val, y_:l})
@@ -451,17 +440,10 @@ def do_train(epoch,_lr=0.01):
             print(n+1, sum_acc/10)
             print(n+1,'th epoch', sum_acc/10,file=fw)
             fw.close()
-        if not os.path.exists('./model/train_dog_e4_'+str(epoch+1)):
-                os.makedirs('./model/train_dog_e4_'+str(epoch+1))
-        saver.save(sess, './model/train_dog_e4_'+str(epoch+1)+'/train_dog_e4_'+str(epoch+1)+'.model')
+        saver.save(sess, './model/train_dog_e4.model')
         coord.request_stop()
         coord.join(threads)
+        sys.exit(0)
 
-
-img_batch,label_batch = load_data()
-for epoch in range(Epoch):
-    if epoch//5==1:
-        learn_rate=0.003
-    elif epoch//5==2:
-        learn_rate=0.001
-    do_train(epoch,learn_rate)
+cnnTrain()
+        

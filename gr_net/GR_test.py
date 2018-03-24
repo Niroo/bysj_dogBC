@@ -426,6 +426,8 @@ def cnnTrain():
                                            feed_dict={x:val,y_:l})
                 summary_writer.add_summary(summary, n*num_batch+i)
                 print(i+1,"loss:",loss)
+            if not os.path.exists('./acc'):
+                os.makedirs('./acc')
             sum_acc=0
             fw=open('./acc/acc_e4.txt','a')
             for j in range(10):

@@ -8,18 +8,15 @@ import sys
 
 size=256
 batch_size=10
-num_batch=100
+num_batch=10
 img=[]
 label=[]
-img_batch=[]
-label_batch=[]
-n_classes=120
+n_classes=6
 Epoch = 10
-learn_rate = 0.01
 
-def read_and_decode(filename):
+def read_and_decode(filename,epoch):
     #根据文件名生成一个队列
-    filename_queue = tf.train.string_input_producer([filename],Epoch)
+    filename_queue = tf.train.string_input_producer([filename],epoch)
 
     reader = tf.TFRecordReader()
     _, serialized_example = reader.read(filename_queue)   #返回文件名和文件
@@ -33,7 +30,8 @@ def read_and_decode(filename):
     img = tf.reshape(img, [size, size, 3])
     img = tf.cast(img, tf.float32)*(1. / 255) - 0.5
     label = tf.cast(features['label'], tf.int32)
-    
+    #label = tf.one_hot(label, depth= n_classes)
+    #label = tf.reshape(label, [_, n_classes])
     #print(label)
 
     return img, label
@@ -41,7 +39,7 @@ def read_and_decode(filename):
 
 def load_data():
 
-    img,label=read_and_decode("../tfrecord/train.tfrecords")
+    img,label=read_and_decode("../test_6/train.tfrecords",Epoch)
 
 
     img_batch, label_batch = tf.train.shuffle_batch([img, label],
@@ -221,7 +219,7 @@ weights = {
     'conv2_3x3_R1': tf.Variable(tf.random_normal([3,3,480,200])),
     'conv2_1x1_R2': tf.Variable(tf.random_normal([1,1,680,480])),
     'conv2_3x3_R2': tf.Variable(tf.random_normal([3,3,480,200])),
-    'FC2': tf.Variable(tf.random_normal([8*8*1024, 120]))
+    'FC2': tf.Variable(tf.random_normal([8*8*1024, 6]))
 }
 
 biases = {
@@ -236,7 +234,7 @@ biases = {
     'conv2_3x3_R1': tf.Variable(tf.random_normal([200])),
     'conv2_1x1_R2': tf.Variable(tf.random_normal([480])),
     'conv2_3x3_R2': tf.Variable(tf.random_normal([200])),
-    'FC2': tf.Variable(tf.random_normal([120]))
+    'FC2': tf.Variable(tf.random_normal([6]))
 
 }
 pooling = {
@@ -403,33 +401,32 @@ conv_B_5b = {
 }
 
 
-# 比较标签是否相等，再求的所有数的平均值，tf.cast(强制转换类型)
-
 out = GoogleLeNet_topological_structure(x)
 
 cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=out, labels=y_))
 
-train_step = tf.train.AdamOptimizer(learn_rate).minimize(cross_entropy)
+train_step = tf.train.AdamOptimizer(0.03).minimize(cross_entropy)
+# 比较标签是否相等，再求的所有数的平均值，tf.cast(强制转换类型)
 accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(out, 1), tf.argmax(y_, 1)), tf.float32))
-tf.summary.scalar('loss', cross_entropy)
+
 tf.summary.scalar('accuracy', accuracy)
 merged_summary_op = tf.summary.merge_all()
+# 数据保存器的初始化
+saver = tf.train.Saver()
 
-def do_train(epoch,_lr=0.01):
-    learn_rate=_lr
-    # 数据保存器的初始化
-    saver = tf.train.Saver()
+def do_train(epoch):
     with tf.Session() as sess:
-        sess.run(tf.local_variables_initializer())
+        init2 = tf.local_variables_initializer()
+        sess.run(init2)
         if epoch==0:        
             saver.restore(sess, './model/train_dog_e4.model')
         else:
-            saver.restore(sess, './model/train_dog_e4_'+str(epoch)+'/train_dog_e4_'+str(epoch)+'.model')
+            saver.restore(sess, './model_test/train_dog_e4_'+str(epoch)+'.tfmodel')
         summary_writer = tf.summary.FileWriter('./train_test/dog_120_e4', graph=tf.get_default_graph())
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-        for n in range(5):
+        for n in range(1):
              # 每次取batch_size张图片
             for i in range(num_batch):
                 val, l= sess.run([img_batch, label_batch])
@@ -451,17 +448,11 @@ def do_train(epoch,_lr=0.01):
             print(n+1, sum_acc/10)
             print(n+1,'th epoch', sum_acc/10,file=fw)
             fw.close()
-        if not os.path.exists('./model/train_dog_e4_'+str(epoch+1)):
-                os.makedirs('./model/train_dog_e4_'+str(epoch+1))
-        saver.save(sess, './model/train_dog_e4_'+str(epoch+1)+'/train_dog_e4_'+str(epoch+1)+'.model')
+        saver.save(sess, './model_test/train_dog_e4_'+str(epoch+1)+'.tfmodel')
         coord.request_stop()
         coord.join(threads)
 
 
 img_batch,label_batch = load_data()
 for epoch in range(Epoch):
-    if epoch//5==1:
-        learn_rate=0.003
-    elif epoch//5==2:
-        learn_rate=0.001
-    do_train(epoch,learn_rate)
+    do_train(epoch)
