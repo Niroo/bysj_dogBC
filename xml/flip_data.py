@@ -34,6 +34,12 @@ for (path, dirnames, filenames) in os.walk(input_dir):
                     # 保存图片
                     cv2.imwrite(output_dir+'/'+path.split('/')[-1]+'/'+str(index)+'.jpg', img)
                     cv2.imwrite(output_dir+'/'+path.split('/')[-1]+'/'+str(index)+'_hf.jpg', do_img)
+                    M1 = cv2.getRotationMatrix2D((256//2, 256//2), 45, 1.41421)
+                    res1 = cv2.warpAffine(img, M1, (256, 256))
+                    M2 = cv2.getRotationMatrix2D((256//2, 256//2), 45, 1.41421)
+                    res2 = cv2.warpAffine(do_img, M2, (256, 256))
+                    cv2.imwrite(output_dir+'/'+path.split('/')[-1]+'/'+str(index)+'_r1.jpg', res1)
+                    cv2.imwrite(output_dir+'/'+path.split('/')[-1]+'/'+str(index)+'_r2.jpg', res2)
                     #print(output_dir+'/'+path.split('/')[-1]+'/'+str(index)+'.jpg')
                     index += 1
         s1 = "\r[%s%s]%.0f%%"%(">"*(num//10)," "*(12-num//10),num/1.2)
