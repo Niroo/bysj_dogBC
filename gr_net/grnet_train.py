@@ -9,7 +9,7 @@ import grnet as gr
 
 size=256
 batch_size=8
-num_batch=100
+num_batch=1000
 img=[]
 label=[]
 n_classes=120
@@ -68,21 +68,6 @@ def do_train():
                 summary_writer.add_summary(summary, n*num_batch+i)
                 print(i+1,"loss:",loss)
 
-            if not os.path.exists('./acc'):
-                os.makedirs('./acc')
-
-            sum_acc=0
-            fw=open('./acc/acc_v3rn_0.txt','a')
-            for j in range(20):
-                val, l= sess.run([img_batch, label_batch])   
-                acc = accuracy.eval({x:val, y_:l})
-                sum_acc+=acc
-                
-                print(j+1, acc,file=fw)
-                
-            print(n+1, sum_acc/20)
-            print(n+1,'th round', sum_acc/20,file=fw)
-            fw.close()
 
 
         saver.save(sess, './model/train_dog_v3rn_0/train_dog_v3rn_0.model')

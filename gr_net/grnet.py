@@ -388,7 +388,7 @@ def gr_net(inputs,
           logits = tf.squeeze(logits, [1, 2], name='SpatialSqueeze')
 
       end_points['Logits'] = logits
-      logits = 0.95*logits+0.05*end_points['AuxLogits']
+      logits = logits+end_points['AuxLogits']
       end_points['Predictions'] = prediction_fn(logits, scope='Predictions') 
   return logits, end_points
 
