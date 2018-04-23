@@ -1,6 +1,6 @@
 # 基于深度卷积神经网络的犬科动物图象识别
 
-![dataset](https://github.com/Niroo/bysj_dogBC/120dog.jpg)
+![dataset](https://github.com/Niroo/bysj_dogBC/blob/master/120dog.jpg)
 ## 文件结构
 
 - xml
